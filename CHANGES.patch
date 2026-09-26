@@ -1,0 +1,223 @@
+diff --git a/src/i18n/default.json b/src/i18n/default.json
+index a84937a..1d2e2f1 100644
+--- a/src/i18n/default.json
++++ b/src/i18n/default.json
+@@ -1 +1,42 @@
+-zh-CN.json
+\ No newline at end of file
++{
++  "common": {
++    "back": "返回"
++  },
++  "sync": {
++    "current": "已同步",
++    "cached": "缓存 · {min}分钟前",
++    "cachedDate": "缓存 · {date}",
++    "offline": "离线",
++    "waiting": "等待用量数据",
++    "demo": "演示",
++    "noBle": "BLE 不可用"
++  },
++  "balance": {
++    "title": "余额",
++    "noData": "--"
++  },
++  "cacheRate": "缓存率",
++  "hitRate": {
++    "noData": "--"
++  },
++  "hit": "命中 {tokens}",
++  "miss": "未命中 {tokens}",
++  "today": {
++    "spend": "今日消费"
++  },
++  "models": {
++    "output": "输出 {tokens}",
++    "usage": "模型用量"
++  },
++  "pricing": {
++    "title": "峰谷定价",
++    "backHint": "右滑返回",
++    "peakHours": "高峰时段",
++    "unit": "价格（¥/1Mt）"
++  },
++  "liang": {
++    "titlePrefix": "滑动变",
++    "titleKeyword": "祖",
++    "titleSuffix": "器"
++  }
++}
+diff --git a/src/i18n/en.json b/src/i18n/en.json
+index 387fd4b..9ccf2ec 100644
+--- a/src/i18n/en.json
++++ b/src/i18n/en.json
+@@ -1,4 +1,7 @@
+ {
++  "common": {
++    "back": "Back"
++  },
+   "sync": {
+     "current": "Synced",
+     "cached": "Cached · {min} min ago",
+diff --git a/src/i18n/zh-CN.json b/src/i18n/zh-CN.json
+index e0625a4..7d69be3 100644
+--- a/src/i18n/zh-CN.json
++++ b/src/i18n/zh-CN.json
+@@ -1,4 +1,7 @@
+ {
++  "common": {
++    "back": "返回"
++  },
+   "sync": {
+     "current": "已同步",
+     "cached": "缓存 · {min}分钟前",
+diff --git a/src/manifest.json b/src/manifest.json
+index dd7f1e0..e5e5e97 100644
+--- a/src/manifest.json
++++ b/src/manifest.json
+@@ -1,8 +1,8 @@
+ {
+   "package": "io.github.mcxcc303.dsband.band",
+   "name": "DSBand",
+-  "versionName": "0.2.0",
+-  "versionCode": 2,
++  "versionName": "0.2.3",
++  "versionCode": 5,
+   "minPlatformVersion": 1200,
+   "icon": "/common/logo.png",
+   "deviceTypeList": [
+diff --git a/src/pages/dashboard/dashboard.css b/src/pages/dashboard/dashboard.css
+index 2ad0653..2247c80 100644
+--- a/src/pages/dashboard/dashboard.css
++++ b/src/pages/dashboard/dashboard.css
+@@ -1,5 +1,6 @@
+ /* 页面基础:布局骨架与通用状态 */
+ .page {
++  position: relative; /* 新增:作为左上角返回按钮的定位参照 */
+   flex-direction: column;
+   width: 100%;
+   height: 100%;
+@@ -48,3 +49,31 @@
+   color: #8a8a8a;
+   margin-bottom: 12px;
+ }
++
++/* 左上角返回按钮(新增) */
++.back-btn {
++  position: absolute;
++  left: 10px;
++  top: 10px;
++  flex-direction: row;
++  align-items: center;
++  justify-content: center;
++  height: 30px;
++  padding-left: 12px;
++  padding-right: 12px;
++  border-radius: 15px;
++  background-color: rgba(138, 138, 138, 0.28);
++}
++
++.back-btn-arrow {
++  font-size: 17px;
++  font-weight: bold;
++  color: #ffffff;
++  margin-right: 5px;
++}
++
++.back-btn-text {
++  font-size: 17px;
++  font-weight: bold;
++  color: #ffffff;
++}
+diff --git a/src/pages/dashboard/dashboard.ux b/src/pages/dashboard/dashboard.ux
+index 4b11e87..275cf72 100644
+--- a/src/pages/dashboard/dashboard.ux
++++ b/src/pages/dashboard/dashboard.ux
+@@ -2,9 +2,9 @@
+ 	<div class="page" @touchstart="onSwipeStart" @touchend="onSwipeEnd">
+ 		<swiper class="swiper" indicator="false" loop="false" @change="onSwiperChange">
+ 			<!-- 面板 1:主表盘 -->
+-			<div class="panel">
++			<div class="panel" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
+ 				<!-- 滚动内容 (scroll-y 必须显式开启,默认 false) -->
+-				<scroll class="content" scroll-y="true">
++				<scroll class="content" scroll-y="true" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
+ 					<!-- 顶部(随内容滚动) -->
+ 					<div class="topbar">
+ 						<div class="arc-clock">
+@@ -138,8 +138,8 @@
+ 			</div>
+ 
+ 			<!-- 面板 2:峰谷定价 -->
+-			<div class="panel">
+-				<scroll class="pricing-content" scroll-y="true">
++			<div class="panel" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
++				<scroll class="pricing-content" scroll-y="true" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
+ 					<div class="pricing-topbar">
+ 						<text class="pricing-back-hint">{{ $t("pricing.backHint") }}</text>
+ 						<text class="pricing-title">{{ $t("pricing.title") }}</text>
+@@ -180,7 +180,7 @@
+ 			</div>
+ 
+ 			<!-- 面板 3:滑动变祖器 -->
+-			<div class="panel">
++			<div class="panel" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
+ 				<div class="liang-page">
+ 					<!-- 时间(与第一屏一致) -->
+ 					<div class="arc-clock">
+@@ -229,6 +229,12 @@
+ 				</div>
+ 			</div>
+ 		</swiper>
++
++		<!-- 左上角返回按钮(新增):点击退出快应用 -->
++		<div class="back-btn" onclick="onBackTap">
++			<text class="back-btn-arrow">&lt;</text>
++			<text class="back-btn-text">{{ $t("common.back") }}</text>
++		</div>
+ 	</div>
+ </template>
+ 
+@@ -486,7 +492,8 @@ export default {
+ 	},
+ 
+ 	getTouchY(evt) {
+-		const list = evt && (evt.touches || evt.changedTouches);
++		// 修正:抬手(touchend)时 touches 为空数组(truthy),必须先取 changedTouches
++		const list = evt && (evt.changedTouches || evt.touches);
+ 		const t = list && list[0];
+ 		if (!t) return -1;
+ 		const y =
+@@ -524,7 +531,8 @@ export default {
+ 	},
+ 
+ 	getTouchX(evt) {
+-		const list = evt && (evt.touches || evt.changedTouches);
++		// 修正:抬手(touchend)时 touches 为空数组(truthy),必须先取 changedTouches
++		const list = evt && (evt.changedTouches || evt.touches);
+ 		const t = list && list[0];
+ 		if (!t) return -1;
+ 		const x =
+@@ -547,12 +555,19 @@ export default {
+ 		const dx = x - this.swipeStartX;
+ 		const dy = y - this.swipeStartY;
+ 		this.swipeStartX = -1;
+-		// 仅在第一页(index 0):手指向右滑动 ≥125px,且 Y 轴偏移 ≤50px 时退出
+-		if (this.swipeIndex === 0 && x >= 0 && dx > 125 && Math.abs(dy) <= 50) {
+-			router.back();
++		// 任意界面(第 1/2/3 屏)手指向右滑即退出快应用。
++		// 不再限制 swipeIndex;判定放宽为 dx > 40 且 dx > |dy|(要求横向位移占优,
++		// 这样纵向滚动内容时不会误退出)。
++		if (x >= 0 && dx > 40 && dx > Math.abs(dy)) {
++			this.$app.exit();
+ 		}
+ 	},
+ 
++	// 左上角返回按钮(新增):点击退出快应用,回到表盘
++	onBackTap() {
++		this.$app.exit();
++	},
++
+ 	// 时钟:每秒检查,仅当分钟文本/峰谷状态变化时更新顶层响应式数据
+ 	// (1s tick 下避免每秒无效赋值触发重绘,字符数组由 computed.clockChars 派生驱动视图)
+ 	tickClock() {

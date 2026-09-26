@@ -1,0 +1,756 @@
+<template>
+	<div class="page" @touchstart="onSwipeStart" @touchend="onSwipeEnd">
+		<swiper class="swiper" indicator="false" loop="false" @change="onSwiperChange">
+			<!-- 面板 1:主表盘 -->
+			<div class="panel" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
+				<!-- 滚动内容 (scroll-y 必须显式开启,默认 false) -->
+				<scroll class="content" scroll-y="true" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
+					<!-- 顶部(随内容滚动) -->
+					<div class="topbar">
+						<div class="arc-clock">
+							<!-- 注意:勿加 tid。键从 0 开始时,首个键 0(falsy)会导致首字符补丁失效 -->
+							<div
+								class="arc-char-box {{ $item.rotClass }}"
+								for="{{ clockChars }}"
+								style="left: {{ $item.x }}px; top: {{ $item.y }}px"
+							>
+								<text
+									class="clock-char"
+									style="color: {{ $item.color }}"
+								>
+									{{ $item.ch }}
+								</text>
+							</div>
+						</div>
+						<text class="brand">DeepSeek</text>
+					</div>
+
+					<!-- 同步状态胶囊 -->
+					<div class="pill {{ statusClass }}">
+						<text class="pill-text" style="color: {{ pillTextColor }}">
+							{{ statusText }}
+						</text>
+					</div>
+
+					<!-- 余额 -->
+					<div class="balance-section">
+						<text class="section-title balance-title">
+							{{ $t("balance.title") }}
+						</text>
+						<text class="balance-main {{ balanceSizeClass }}">
+							{{ balanceText }}
+						</text>
+					</div>
+
+					<div class="divider"></div>
+
+					<!-- 模型总用量占比(Flash 左 / Pro 右;名称一行,数值一行) -->
+					<div class="usage-section">
+						<text class="section-title">{{ $t("models.usage") }}</text>
+						<div class="usage-labels">
+							<text class="usage-label">Flash</text>
+							<text class="usage-label">Pro</text>
+						</div>
+						<div class="usage-labels">
+							<text class="usage-label">{{ flashUsageText }}</text>
+							<text class="usage-label">{{ proUsageText }}</text>
+						</div>
+						<div class="stacked-bar">
+							<div
+								class="stack-seg flash-seg"
+								style="width: {{ flashUsagePercent }}%"
+							></div>
+							<div
+								class="stack-seg pro-seg"
+								style="width: {{ proUsagePercent }}%"
+							></div>
+						</div>
+					</div>
+
+					<div class="divider"></div>
+
+					<!-- 缓存命中率(Pro / Flash 分列) -->
+					<div class="rings-section">
+						<text class="section-title">{{ $t("cacheRate") }}</text>
+						<div class="rings-area">
+							<div class="ring-item">
+								<div class="ring-wrap-sm">
+									<progress
+										class="ring-sm"
+										type="arc"
+										percent="{{ flashHitRatePercent }}"
+										style="color: {{ flashHitRateColor }}"
+									></progress>
+									<div class="ring-center-sm">
+										<text class="ring-label-sm">Flash</text>
+										<text
+											class="ring-value-sm"
+											style="color: {{ flashHitRateColor }}"
+										>
+											{{ flashHitRateText }}
+										</text>
+									</div>
+								</div>
+							</div>
+							<div class="ring-item">
+								<div class="ring-wrap-sm">
+									<progress
+										class="ring-sm"
+										type="arc"
+										percent="{{ proHitRatePercent }}"
+										style="color: {{ proHitRateColor }}"
+									></progress>
+									<div class="ring-center-sm">
+										<text class="ring-label-sm">Pro</text>
+										<text
+											class="ring-value-sm"
+											style="color: {{ proHitRateColor }}"
+										>
+											{{ proHitRateText }}
+										</text>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="divider"></div>
+
+					<!-- 今日消费(Flash / Pro 占比 + 明细) -->
+					<div class="cost-section">
+						<text class="section-title">{{ $t("today.spend") }}</text>
+						<div class="stacked-bar">
+							<div
+								class="stack-seg flash-seg"
+								style="width: {{ flashCostPercent }}%"
+							></div>
+							<div
+								class="stack-seg pro-seg"
+								style="width: {{ proCostPercent }}%"
+							></div>
+						</div>
+						<div class="cost-rows">
+							<text class="cost-row">Flash {{ flashCostText }}</text>
+							<text class="cost-row">Pro {{ proCostText }}</text>
+						</div>
+					</div>
+				</scroll>
+			</div>
+
+			<!-- 面板 2:峰谷定价 -->
+			<div class="panel" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
+				<scroll class="pricing-content" scroll-y="true" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
+					<div class="pricing-topbar">
+						<text class="pricing-back-hint">{{ $t("pricing.backHint") }}</text>
+						<text class="pricing-title">{{ $t("pricing.title") }}</text>
+					</div>
+
+					<!-- 高峰时段 -->
+					<div class="pricing-card">
+						<text class="pricing-card-title">{{ $t("pricing.peakHours") }}</text>
+						<text class="pricing-card-text" for="w in peakWindows">{{ w }}</text>
+					</div>
+
+					<div class="pricing-divider"></div>
+
+					<!-- 各模型峰谷价格 -->
+					<text class="section-title">{{ $t("pricing.unit") }}</text>
+					<div class="pricing-model-block" for="model in pricingModels" tid="name">
+						<text class="pricing-model-name">{{ model.name }}</text>
+						<div class="pricing-table">
+							<!-- 变动前价格 -->
+							<div class="pricing-row">
+								<div class="pricing-cell {{ $idx === 0 ? 'pricing-cell-wide' : '' }}" for="p in model.prev">
+									<text class="pricing-cell-text pricing-cell-text-prev">{{ p }}</text>
+								</div>
+							</div>
+							<div class="pricing-row">
+								<div class="pricing-cell {{ $idx === 0 ? 'pricing-cell-wide' : '' }}" for="p in model.off">
+									<text class="pricing-cell-text">{{ p }}</text>
+								</div>
+							</div>
+							<div class="pricing-row">
+								<div class="pricing-cell {{ $idx === 0 ? 'pricing-cell-wide' : '' }}" for="p in model.peak">
+									<text class="pricing-cell-text pricing-cell-text-peak">{{ p }}</text>
+								</div>
+							</div>
+						</div>
+					</div>
+				</scroll>
+			</div>
+
+			<!-- 面板 3:滑动变祖器 -->
+			<div class="panel" @touchstart="onSwipeStart" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
+				<div class="liang-page">
+					<!-- 时间(与第一屏一致) -->
+					<div class="arc-clock">
+						<!-- 注意:勿加 tid。键从 0 开始时,首个键 0(falsy)会导致首字符补丁失效 -->
+						<div
+							class="arc-char-box {{ $item.rotClass }}"
+							for="{{ clockChars }}"
+							style="left: {{ $item.x }}px; top: {{ $item.y }}px"
+						>
+							<text class="clock-char" style="color: {{ $item.color }}">{{ $item.ch }}</text>
+						</div>
+					</div>
+
+					<div class="liang-title-row">
+						<text class="liang-title">{{ $t("liang.titlePrefix") }}</text>
+						<text class="liang-title liang-title-key">{{ $t("liang.titleKeyword") }}</text>
+						<text class="liang-title">{{ $t("liang.titleSuffix") }}</text>
+					</div>
+
+					<div class="liang-body">
+						<div
+							class="liang-track"
+							@touchstart="onLiangTouchStart"
+							@touchmove="onLiangTouchMove"
+							@touchend="onLiangTouchEnd"
+						>
+							<div class="liang-wire"></div>
+							<div class="liang-slider" style="top: {{ liangPos }}px">
+								<div class="liang-thumb-frame">
+									<image class="liang-thumb" src="/common/liang.png"></image>
+								</div>
+								<div class="liang-redline"></div>
+							</div>
+						</div>
+
+						<div class="liang-scale">
+							<text
+								class="liang-label {{ $item.idx === liangLevel ? 'liang-label-active' : '' }}"
+								for="{{ liangLevels }}"
+								style="top: {{ $item.top }}px"
+							>{{ $item.text }}</text>
+						</div>
+					</div>
+
+					<text class="liang-current">{{ liangCurrentText }}</text>
+				</div>
+			</div>
+		</swiper>
+
+		<!-- 左上角返回按钮(新增):点击退出快应用 -->
+		<div class="back-btn" onclick="onBackTap">
+			<text class="back-btn-arrow">&lt;</text>
+			<text class="back-btn-text">{{ $t("common.back") }}</text>
+		</div>
+	</div>
+</template>
+
+<style>
+@import "./dashboard.css";
+@import "./topbar.css";
+@import "./pill.css";
+@import "./balance.css";
+@import "./cost.css";
+@import "./ring.css";
+@import "./usage.css";
+@import "./stack.css";
+@import "./pricing.css";
+@import "./liang.css";
+</style>
+
+<script>
+import storage from "@system.storage";
+import router from "@system.router";
+import {
+	startSync as mockStartSync,
+	stopSync as mockStopSync,
+} from "../../common/mock-client";
+import {
+	startSync as httpStartSync,
+	stopSync as httpStopSync,
+} from "../../common/http-client";
+import {
+	startSync as icStartSync,
+	stopSync as icStopSync,
+} from "../../common/interconnect-client";
+import { arcClockChars } from "../../common/clock-arc";
+import {
+	isPeakWindow,
+	CLOCK_PEAK_COLOR,
+	CLOCK_NORMAL_COLOR,
+	PRICING_MODELS,
+	PEAK_WINDOWS,
+} from "../../common/pricing";
+import { balanceFontClass } from "../../common/balance-font";
+import { resolveSyncConfig } from "../../common/sync-config";
+import { loadCachedSnapshot } from "../../common/cache";
+import { restore } from "../../common/screen";
+import {
+	formatMoney,
+	formatTokensCompact,
+	hitRateColor,
+	splitModels,
+	FLASH_HIT_RATE_LOW,
+	FLASH_HIT_RATE_MID,
+	FLASH_HIT_COLORS,
+	minutesAgo,
+	formatCacheDate,
+	formatClockHM,
+} from "../../common/snapshot";
+
+const CLOCK_INTERVAL = 1000; // 1s tick:分钟跳变/峰谷切换最多延迟 1s,且唤醒后 1s 内自愈
+const SYNC_FRESH_SECS = 180; // 快照 3 分钟内视为「已同步」,超过显示「缓存」
+
+// 滑动变祖器(第三屏)
+const LIANG_LEVELS = ["梁神", "梁圣", "梁爷爷", "梁叔叔", "梁子", "牢梁", "梁白开", "小南梁"];
+const LIANG_STORAGE_KEY = "liangPos";
+const LIANG_TRACK_H = 300; // 轨道高度(px),与 CSS .liang-track 一致
+const LIANG_SLIDER_H = 44; // 滑片组件高度(px):金属边框图片高度
+const LIANG_MAX_POS = LIANG_TRACK_H - LIANG_SLIDER_H; // 滑片最大位移(256)
+const LIANG_SCALE_TOP = 11; // 名称标注顶部偏移(使名称中心与红线档位中心对齐)
+const LIANG_SCALE_STEP = 37; // 名称标注间距(px)
+
+function pad(n) {
+	return n < 10 ? "0" + n : String(n);
+}
+
+function formatPrice(n) {
+	// 单位已由表格上方标题标注(¥/1Mt),单元格仅显示数值
+	// 小于 1 元:保留到分,若第三位小数非零则保留三位(如变动前 0.025)
+	if (n < 1) {
+		const s = n.toFixed(3);
+		return s.slice(-1) === "0" ? s.slice(0, -1) : s;
+	}
+	const s = n.toFixed(1);
+	return s.slice(-2) === ".0" ? s.slice(0, -2) : s;
+}
+
+export default {
+	private: {
+		clockText: "--:--", // 时钟源数据(顶层响应式,变更驱动 clockChars 计算属性)
+		clockPeak: false, // 当前是否处于高峰计费时段(时钟配色)
+		statusText: "",
+		statusClass: "pill-wait",
+		pillTextColor: "#8a8a8a",
+		mockFlag: false, // 演示数据模式
+
+		balanceText: "",
+		balanceSizeClass: "balance-f64",
+
+		// 模型总用量占比条
+		proUsageText: "--",
+		flashUsageText: "--",
+		proUsagePercent: 0,
+		flashUsagePercent: 0,
+
+		// 缓存命中率双环
+		proHitRateText: "--",
+		proHitRateColor: "#8a8a8a",
+		proHitRatePercent: 0,
+		flashHitRateText: "--",
+		flashHitRateColor: "#8a8a8a",
+		flashHitRatePercent: 0,
+
+		// 今日消费占比条
+		proCostText: "--",
+		flashCostText: "--",
+		proCostPercent: 0,
+		flashCostPercent: 0,
+
+		// 峰谷定价页(第二屏)
+		peakWindows: [],
+		pricingModels: [],
+
+		// 滑动变祖器(第三屏)
+		liangLevels: [],
+		liangPos: 0,
+		liangLevel: 0,
+		liangCurrentText: "",
+		liangDragStartY: -1,
+		liangDragStartPos: 0,
+
+		swipeIndex: 0, // 当前 swiper 页索引
+		swipeStartX: -1, // 第一页右滑检测(触摸起始 X)
+		swipeStartY: -1, // 第一页右滑检测(触摸起始 Y)
+
+		lastSnapTime: 0, // 最近渲染的快照 generatedAt(去重,避免重复 UI 更新)
+		gotLiveData: false, // 是否已收到实时数据(收到后跳过缓存渲染)
+		lastSnap: null, // 最近一次渲染的快照(供 tickClock 周期刷新胶囊新鲜度)
+	},
+
+	// 计算属性:时钟字符数组由顶层响应式数据派生。
+	// clockText/clockPeak 变化时框架自动重算并刷新视图,无需手动重建数组。
+	computed: {
+		clockChars() {
+			const chars = arcClockChars(this.clockText);
+			const color = this.clockPeak ? CLOCK_PEAK_COLOR : CLOCK_NORMAL_COLOR;
+			for (const c of chars) c.color = color;
+			return chars;
+		},
+	},
+
+	onInit() {
+		this.initPricing();
+		this.initLiang();
+		// 启动时序:常亮逻辑已移除,不再需要与 brighten(500ms) 错开,整体压缩到 300ms 内完成
+		this.clockTimer = setInterval(() => this.tickClock(), CLOCK_INTERVAL);
+		this.tickTimer = setTimeout(() => this.tickClock(), 0);
+		this.renderEmpty();
+		// 缓存渲染 300ms 内完成(收到实时数据则跳过,避免重复/覆盖)
+		this.cacheTimer = setTimeout(() => {
+			loadCachedSnapshot((snap) => {
+				if (snap && !this.gotLiveData) this.renderSnapshot(snap);
+			});
+		}, 300);
+	},
+
+	onShow() {
+		// 息屏唤醒会重新触发 onShow,期间定时器可能被挂起 → 立即刷新时钟
+		this.tickClock();
+		if (this.brightenTimer) clearTimeout(this.brightenTimer);
+		this.startSync();
+	},
+
+	onHide() {
+		mockStopSync();
+		httpStopSync();
+		icStopSync();
+		restore();
+	},
+
+	onDestroy() {
+		mockStopSync();
+		httpStopSync();
+		icStopSync();
+		restore();
+		if (this.clockTimer) {
+			clearInterval(this.clockTimer);
+			this.clockTimer = null;
+		}
+		if (this.cacheTimer) {
+			clearTimeout(this.cacheTimer);
+			this.cacheTimer = null;
+		}
+		if (this.tickTimer) {
+			clearTimeout(this.tickTimer);
+			this.tickTimer = null;
+		}
+		if (this.brightenTimer) {
+			clearTimeout(this.brightenTimer);
+			this.brightenTimer = null;
+		}
+	},
+
+	// 峰谷定价页静态数据(第二屏)
+	initPricing() {
+		this.peakWindows = PEAK_WINDOWS.map(
+			(w) => pad(w.start) + ":00-" + pad(w.end) + ":00"
+		);
+		this.pricingModels = PRICING_MODELS.map((m) => ({
+			name: m.short.charAt(0).toUpperCase() + m.short.slice(1),
+			prev: m.rows.map((r) => formatPrice(r.prev)),
+			off: m.rows.map((r) => formatPrice(r.off)),
+			peak: m.rows.map((r) => formatPrice(r.peak)),
+		}));
+	},
+
+	// 滑动变祖器(第三屏):无极调节,结果文本由位置计算
+	initLiang() {
+		this.liangLevels = LIANG_LEVELS.map((text, i) => ({
+			text,
+			top: LIANG_SCALE_TOP + i * LIANG_SCALE_STEP,
+			idx: i,
+		}));
+		this.loadLiangPos();
+	},
+
+	loadLiangPos() {
+		storage.get({
+			key: LIANG_STORAGE_KEY,
+			success: (data) => {
+				const v = parseInt(data, 10);
+				if (!isNaN(v)) {
+					this.setLiangPos(this.clampLiangPos(v));
+				}
+			},
+		});
+	},
+
+	setLiangPos(pos) {
+		this.liangPos = pos;
+		this.liangLevel = this.computeLiangLevel(pos);
+		this.liangCurrentText = LIANG_LEVELS[this.liangLevel];
+	},
+
+	computeLiangLevel(pos) {
+		const ratio = LIANG_MAX_POS > 0 ? pos / LIANG_MAX_POS : 0;
+		return Math.round(ratio * (LIANG_LEVELS.length - 1));
+	},
+
+	saveLiangPos() {
+		storage.set({
+			key: LIANG_STORAGE_KEY,
+			value: String(this.liangPos),
+		});
+	},
+
+	clampLiangPos(pos) {
+		return Math.max(0, Math.min(pos, LIANG_MAX_POS));
+	},
+
+	getTouchY(evt) {
+		// 修正:抬手(touchend)时 touches 为空数组(truthy),必须先取 changedTouches
+		const list = evt && (evt.changedTouches || evt.touches);
+		const t = list && list[0];
+		if (!t) return -1;
+		const y =
+			t.clientY != null ? t.clientY : t.pageY != null ? t.pageY : t.screenY;
+		return y != null ? y : -1;
+	},
+
+	onLiangTouchStart(evt) {
+		const y = this.getTouchY(evt);
+		if (y < 0) return;
+		this.liangDragStartY = y;
+		this.liangDragStartPos = this.liangPos;
+	},
+
+	onLiangTouchMove(evt) {
+		if (this.liangDragStartY < 0) return;
+		const y = this.getTouchY(evt);
+		if (y < 0) return;
+		this.setLiangPos(
+			this.clampLiangPos(this.liangDragStartPos + (y - this.liangDragStartY))
+		);
+	},
+
+	onLiangTouchEnd() {
+		if (this.liangDragStartY < 0) return;
+		this.liangDragStartY = -1;
+		this.saveLiangPos();
+	},
+
+	// 第一页右滑退出应用(swiper 会消费 swipe 事件,改用触摸事件检测方向)
+	onSwiperChange(e) {
+		if (e && e.index != null) {
+			this.swipeIndex = e.index;
+		}
+	},
+
+	getTouchX(evt) {
+		// 修正:抬手(touchend)时 touches 为空数组(truthy),必须先取 changedTouches
+		const list = evt && (evt.changedTouches || evt.touches);
+		const t = list && list[0];
+		if (!t) return -1;
+		const x =
+			t.clientX != null ? t.clientX : t.pageX != null ? t.pageX : t.screenX;
+		return x != null ? x : -1;
+	},
+
+	onSwipeStart(evt) {
+		const x = this.getTouchX(evt);
+		const y = this.getTouchY(evt);
+		if (x < 0 || y < 0) return;
+		this.swipeStartX = x;
+		this.swipeStartY = y;
+	},
+
+	onSwipeEnd(evt) {
+		if (this.swipeStartX < 0) return;
+		const x = this.getTouchX(evt);
+		const y = this.getTouchY(evt);
+		const dx = x - this.swipeStartX;
+		const dy = y - this.swipeStartY;
+		this.swipeStartX = -1;
+		// 任意界面(第 1/2/3 屏)手指向右滑即退出快应用。
+		// 不再限制 swipeIndex;判定放宽为 dx > 40 且 dx > |dy|(要求横向位移占优,
+		// 这样纵向滚动内容时不会误退出)。
+		if (x >= 0 && dx > 40 && dx > Math.abs(dy)) {
+			this.$app.exit();
+		}
+	},
+
+	// 左上角返回按钮(新增):点击退出快应用,回到表盘
+	onBackTap() {
+		this.$app.exit();
+	},
+
+	// 时钟:每秒检查,仅当分钟文本/峰谷状态变化时更新顶层响应式数据
+	// (1s tick 下避免每秒无效赋值触发重绘,字符数组由 computed.clockChars 派生驱动视图)
+	tickClock() {
+		const now = new Date();
+		const text = formatClockHM(now);
+		const peak = isPeakWindow(now);
+		if (text !== this.clockText) this.clockText = text;
+		if (peak !== this.clockPeak) this.clockPeak = peak;
+		// 周期刷新同步胶囊:无新快照时,超时后自动从「已同步」过渡到「缓存 · X分钟前」
+		this.applyPill(this.lastSnap);
+	},
+
+	// 数据同步
+	startSync() {
+		const cfg = resolveSyncConfig(this.$app);
+		this.mockFlag = cfg.mock;
+
+		const handlers = {
+			onSnapshot: (snap) => {
+				// 去重:相同 generatedAt 的快照不重复渲染(避免连续 UI 更新触发系统卡死)
+				if (this.lastSnapTime === snap.generatedAt) return;
+				this.lastSnapTime = snap.generatedAt;
+				this.gotLiveData = true; // 已收到实时数据,跳过后续缓存渲染
+				this.renderSnapshot(snap);
+			},
+			onOffline: () => {
+				this.setStatus("pill-bad", "#ff7e7e", this.$t("sync.offline"));
+			},
+			onUnavailable: () => {
+				this.setStatus("pill-bad", "#ff7e7e", this.$t("sync.noBle"));
+			},
+			// interconnect 连接建立后,停掉 http 轮询(interconnect 优先)
+			onOpen: () => {
+				httpStopSync();
+			},
+		};
+
+		if (cfg.mock) {
+			mockStartSync(handlers, { mockScene: cfg.mockScene });
+			return;
+		}
+		if (cfg.transport === "http") {
+			httpStartSync(handlers, { url: cfg.snapshotUrl });
+			return;
+		}
+		if (cfg.transport === "interconnect") {
+			icStartSync(handlers);
+			return;
+		}
+		// auto:interconnect 优先(真机),http 兜底(模拟器);
+		// interconnect 收数/连接后停 http;http 失败不置离线(等待 interconnect 主通道)
+		icStartSync(handlers);
+		httpStartSync(
+			{ onSnapshot: handlers.onSnapshot },
+			{ url: cfg.snapshotUrl }
+		);
+	},
+
+	// 快照 → UI 派生
+	renderSnapshot(snap) {
+		const balance = snap.balance;
+
+		// 同步胶囊(按快照生成时间派生,见 applyPill)
+		this.lastSnap = snap;
+		this.applyPill(snap);
+
+		if (balance) {
+			this.balanceText = formatMoney(balance.total);
+			this.balanceSizeClass = balanceFontClass(balance.total);
+		} else {
+			this.balanceText = this.$t("balance.noData");
+			this.balanceSizeClass = "balance-f48";
+		}
+
+		// 模型拆分(Pro / Flash);命中率不再用顶层 cache,改用各模型自己的 hit/miss
+		const { pro, flash } = splitModels(snap.models);
+
+		// 1) 模型总用量占比(用量 = output tokens)
+		const usageTotal = pro.outputTokens + flash.outputTokens;
+		this.proUsageText = formatTokensCompact(pro.outputTokens);
+		this.flashUsageText = formatTokensCompact(flash.outputTokens);
+		this.proUsagePercent =
+			usageTotal > 0 ? (pro.outputTokens / usageTotal) * 100 : 0;
+		this.flashUsagePercent =
+			usageTotal > 0 ? (flash.outputTokens / usageTotal) * 100 : 0;
+
+		// 2) 缓存命中率双环(Pro 用默认阈值;Flash 阈值更低)
+		this.renderRing("pro", pro.hitRate, hitRateColor(pro.hitRate));
+		this.renderRing(
+			"flash",
+			flash.hitRate,
+			hitRateColor(
+				flash.hitRate,
+				FLASH_HIT_RATE_LOW,
+				FLASH_HIT_RATE_MID,
+				FLASH_HIT_COLORS
+			)
+		);
+
+		// 3) 今日消费占比
+		const costTotal = pro.cost + flash.cost;
+		this.proCostText = formatMoney(pro.cost);
+		this.flashCostText = formatMoney(flash.cost);
+		this.proCostPercent = costTotal > 0 ? (pro.cost / costTotal) * 100 : 0;
+		this.flashCostPercent = costTotal > 0 ? (flash.cost / costTotal) * 100 : 0;
+	},
+
+	// 缓存命中率环(单环渲染;rate 为 null 时显示 --)
+	renderRing(prefix, rate, color) {
+		if (rate !== null && rate !== undefined) {
+			this[prefix + "HitRateText"] = String(Math.floor(rate * 100)) + "%";
+			this[prefix + "HitRateColor"] = color;
+			this[prefix + "HitRatePercent"] = Math.floor(rate * 100);
+		} else {
+			this[prefix + "HitRateText"] = this.$t("hitRate.noData");
+			this[prefix + "HitRateColor"] = "#8a8a8a";
+			this[prefix + "HitRatePercent"] = 0;
+		}
+	},
+
+	// 同步胶囊文案(按快照生成时间派生):
+	// - 双源无数据(unavailable)→ 离线
+	// - 3 分钟内 → 已同步;超过 3 分钟 → 缓存(本地缓存读取同样适用)
+	// 仅状态变化时写入顶层数据,可安全地每秒调用(tickClock 周期刷新)
+	applyPill(snap) {
+		if (!snap) return;
+		let pillClass, textColor, text;
+		if (snap.freshness === "unavailable") {
+			pillClass = "pill-bad";
+			textColor = "#ff7e7e";
+			text = this.$t("sync.offline");
+		} else if (Date.now() / 1000 - snap.generatedAt <= SYNC_FRESH_SECS) {
+			pillClass = "pill-ok";
+			textColor = "#67ce91";
+			text = this.mockFlag
+				? this.$t("sync.demo") + " · " + this.$t("sync.current")
+				: this.$t("sync.current");
+		} else {
+			const min = minutesAgo(snap.generatedAt);
+			pillClass = "pill-warn";
+			textColor = "#f5c344";
+			// 超过 99 分钟改显日期(如 8/11):分钟数三位起会超出胶囊宽度
+			if (min !== null && min > 99) {
+				text = this.$t("sync.cachedDate", { date: formatCacheDate(snap.generatedAt) });
+			} else {
+				text = this.$t("sync.cached", { min: min === null ? 0 : min });
+			}
+		}
+		if (
+			text !== this.statusText ||
+			pillClass !== this.statusClass ||
+			textColor !== this.pillTextColor
+		) {
+			this.setStatus(pillClass, textColor, text);
+		}
+	},
+
+	// 同步胶囊状态统一入口
+	setStatus(pillClass, textColor, text) {
+		this.statusClass = pillClass;
+		this.pillTextColor = textColor;
+		this.statusText = text;
+	},
+
+	// 初始/无数据
+	renderEmpty() {
+		this.setStatus("pill-wait", "#8a8a8a", this.$t("sync.waiting"));
+		this.balanceText = this.$t("balance.noData");
+		this.balanceSizeClass = "balance-f48";
+		this.proUsageText = "--";
+		this.flashUsageText = "--";
+		this.proUsagePercent = 0;
+		this.flashUsagePercent = 0;
+		this.proHitRateText = "--";
+		this.proHitRateColor = "#8a8a8a";
+		this.proHitRatePercent = 0;
+		this.flashHitRateText = "--";
+		this.flashHitRateColor = "#8a8a8a";
+		this.flashHitRatePercent = 0;
+		this.proCostText = "--";
+		this.flashCostText = "--";
+		this.proCostPercent = 0;
+		this.flashCostPercent = 0;
+	},
+};
+</script>

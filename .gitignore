@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/
+.temp_*/
+.npm-cache/
+*.log
+
+# 构建产物已放在 release/ 下,此处的 dist/build 只是本地构建残留

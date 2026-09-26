@@ -1,0 +1,9 @@
+# 统一使用 LF 行尾,避免 Windows 下 autocrlf 造成整文件级 diff 噪音
+* text=auto eol=lf
+
+# 二进制资源不要做行尾/文本转换
+*.rpk binary
+*.png binary
+
+# 补丁文件本身必须保持原样
+*.patch -text
